@@ -1,0 +1,107 @@
+---
+title: "Retail Sales Dashboard"
+author: "Prokarsha"
+date: "2024-02-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cars}
+# Load required libraries
+library(dplyr)
+library(shiny)
+library(DT) # For interactive tables
+library(ggplot2) # For plotting
+library(leaflet) # For interactive maps
+library(rnaturalearth) # For world shapefile data
+```
+
+
+
+```{r pressure, echo=FALSE}
+# Load the world shapefile
+world <- ne_countries(scale = "medium", returnclass = "sf")
+```
+
+```{r}
+# Load the dataset
+sample_data <- read.csv(file.choose())  
+View(sample_data)
+```
+
+
+```{r}
+# Define UI for application
+ui <- fluidPage(
+  
+  # Application title
+  titlePanel("Retail Sales Dashboard"),
+  
+  # Sidebar layout with input parameters
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("country", "Select Country:", choices = unique(sample_data$Country)),
+      numericInput("rows", "Number of Rows to Display:", value = 10, min = 1, max = nrow(sample_data))
+    ),
+    
+    # Main panel with DataTable output and plots
+    mainPanel(
+      DTOutput("table"),
+      plotOutput("barplot"),
+      plotOutput("piechart"),
+      leafletOutput("map")
+    )
+  )
+)
+```
+
+
+```{r}
+# Define server logic
+server <- function(input, output) {
+  
+  # Filter data based on selected country
+  filtered_data <- reactive({
+    subset(sample_data, Country == input$country)
+  })
+  
+  # Render the DataTable with the specified number of rows
+  output$table <- renderDT({
+    head(filtered_data(), input$rows)
+  })
+  
+  # Plot for sales quantity by country
+  output$barplot <- renderPlot({
+    ggplot(filtered_data(), aes(x = Country, y = Quantity)) +
+      geom_bar(stat = "sum", fill = "skyblue", color = "black") +
+      labs(title = "Sales Quantity by Country", x = "Country", y = "Quantity")
+  })
+  
+  # Pie chart for sales distribution by country
+  output$piechart <- renderPlot({
+    ggplot(filtered_data(), aes(x = "", fill = Country)) +
+      geom_bar(width = 1) +
+      coord_polar("y", start = 0) +
+      labs(title = "Sales Distribution by Country", fill = "Country") +
+      theme_void()
+  })
+  
+  # Render the map of the selected country
+  output$map <- renderLeaflet({
+    leaflet(world) %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(data = world[world$name == input$country, ], fillOpacity = 0.5)
+  })
+}
+```
+
+
+
+```{r}
+# Run the application
+shinyApp(ui = ui, server = server)
+```
